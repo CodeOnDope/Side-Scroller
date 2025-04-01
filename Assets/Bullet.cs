@@ -17,9 +17,9 @@ public class Bullet : MonoBehaviour
             other.GetComponent<EnemyFSM>().TakeDamage(damage);
             Destroy(gameObject);
         }
-        else if (other.CompareTag("Player"))
-        {
-            Destroy(gameObject); // Destroy the bullet if it hits an obstacle
-        }
+        //else if (other.CompareTag("Player"))
+        //{
+        //    Destroy(gameObject); // Destroy the bullet if it hits an obstacle
+        //}
     }
 }
