@@ -1,4 +1,4 @@
-using UnityEngine;
+/*using UnityEngine;
 
 // Enum to define possible enemy states
 public enum EnemyState
@@ -233,5 +233,225 @@ public class EnemyFSM : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, attackRadius);
 
 
+    }
+}*/
+
+using UnityEngine;
+
+public class EnemyFSM : MonoBehaviour
+{
+    public enum EnemyState { Patrol, Chase, Attack, Idle }
+    private EnemyState currentState;
+
+    [Header("Movement Settings")]
+    public float patrolSpeed = 2f;
+    public Transform[] patrolPoints;
+
+    [Header("Detection Settings")]
+    public float detectionRadius = 5f;
+    public float attackRadius = 1.5f;
+
+    [Header("Attack Settings")]
+    public float attackCooldown = 1.5f;
+    public GameObject bulletPrefab;
+    public Transform firePoint;
+    public float bulletSpeed = 5f;
+
+    [Header("Health Settings")]
+    public float maxHealth = 50f;
+
+    [Header("Death Visuals")]
+    public GameObject deathEffectPrefab; // Particle effect prefab for death
+    public float deathEffectDuration = 1f; // Duration before the effect is destroyed
+
+    private Transform playerTransform;
+    private int currentWaypointIndex = 0;
+    private float lastAttackTime;
+    private float currentHealth;
+    private Rigidbody2D rb;
+    private SpriteRenderer spriteRenderer;
+    private bool isFacingRight = true;
+    public EnemyData enemyData;
+
+    void Start()
+    {
+        currentState = EnemyState.Patrol;
+        playerTransform = GameObject.FindGameObjectWithTag("Player").transform;
+        rb = GetComponent<Rigidbody2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
+
+        // Initialize stats from EnemyData
+        if (enemyData != null)
+        {
+            currentHealth = enemyData.maxHealth;
+            patrolSpeed = enemyData.speed;
+            detectionRadius = enemyData.detectionRadius;
+            attackRadius = enemyData.attackRadius;
+            attackCooldown = enemyData.attackCooldown;
+            bulletSpeed = enemyData.bulletSpeed;
+
+            if (enemyData.enemySprite != null)
+            {
+                spriteRenderer.sprite = enemyData.enemySprite;
+            }
+        }
+    }
+
+    void Update()
+    {
+        switch (currentState)
+        {
+            case EnemyState.Patrol:
+                Patrol();
+                break;
+            case EnemyState.Chase:
+                Chase();
+                break;
+            case EnemyState.Attack:
+                Attack();
+                break;
+            case EnemyState.Idle:
+                Idle();
+                break;
+        }
+
+        CheckStateTransitions();
+    }
+
+    void Patrol()
+    {
+        if (patrolPoints.Length == 0) return;
+
+        Transform targetPoint = patrolPoints[currentWaypointIndex];
+        transform.position = Vector2.MoveTowards(transform.position, targetPoint.position, patrolSpeed * Time.deltaTime);
+
+        // Flip sprite based on movement direction
+        if (targetPoint.position.x > transform.position.x && !isFacingRight)
+        {
+            Flip();
+        }
+        else if (targetPoint.position.x < transform.position.x && isFacingRight)
+        {
+            Flip();
+        }
+
+        if (Vector2.Distance(transform.position, targetPoint.position) < 0.1f)
+        {
+            currentWaypointIndex = (currentWaypointIndex + 1) % patrolPoints.Length;
+        }
+    }
+
+    void Chase()
+    {
+        transform.position = Vector2.MoveTowards(transform.position, playerTransform.position, patrolSpeed * Time.deltaTime);
+
+        // Flip sprite based on movement direction
+        if (playerTransform.position.x > transform.position.x && !isFacingRight)
+        {
+            Flip();
+        }
+        else if (playerTransform.position.x < transform.position.x && isFacingRight)
+        {
+            Flip();
+        }
+    }
+
+    void Attack()
+    {
+        if (Time.time - lastAttackTime > attackCooldown)
+        {
+            Shoot();
+            lastAttackTime = Time.time;
+        }
+    }
+
+    void Idle()
+    {
+        // Enemy does nothing in Idle state
+    }
+
+    void Shoot()
+    {
+        // Instantiate a bullet and shoot it toward the player
+        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+        Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
+        Vector2 direction = (playerTransform.position - firePoint.position).normalized;
+        bulletRb.linearVelocity = direction * bulletSpeed;
+
+        // Rotate the bullet to face the direction it's traveling
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        bullet.transform.rotation = Quaternion.Euler(0, 0, angle);
+    }
+
+    void CheckStateTransitions()
+    {
+        float distanceToPlayer = Vector2.Distance(transform.position, playerTransform.position);
+
+        if (distanceToPlayer <= attackRadius)
+        {
+            currentState = EnemyState.Attack;
+        }
+        else if (distanceToPlayer <= detectionRadius)
+        {
+            currentState = EnemyState.Chase;
+        }
+        else
+        {
+            currentState = EnemyState.Patrol;
+        }
+    }
+
+    public void TakeDamage(float damageAmount)
+    {
+        currentHealth -= damageAmount;
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    void Die()
+    {
+        // Drop pickup if applicable
+        if (enemyData != null && enemyData.pickupToDrop != null)
+        {
+            float randomValue = Random.value; // Random value between 0 and 1
+            if (randomValue <= enemyData.dropChance)
+            {
+                DropPickup();
+            }
+        }
+
+        // Destroy the enemy
+        Destroy(gameObject);
+    }
+
+
+    void DropPickup()
+    {
+        // Instantiate the pickup GameObject
+        GameObject pickup = new GameObject("Pickup");
+        pickup.transform.position = transform.position;
+
+        // Add a SpriteRenderer to display the pickup sprite
+        SpriteRenderer pickupSpriteRenderer = pickup.AddComponent<SpriteRenderer>();
+        pickupSpriteRenderer.sprite = enemyData.pickupToDrop.pickupSprite;
+
+        // Add a Collider2D for interaction
+        CircleCollider2D collider = pickup.AddComponent<CircleCollider2D>();
+        collider.isTrigger = true;
+
+        // Add the Pickup script to handle player interaction
+        Pickup pickupScript = pickup.AddComponent<Pickup>();
+        pickupScript.pickupData = enemyData.pickupToDrop;
+    }
+
+    void Flip()
+    {
+        isFacingRight = !isFacingRight;
+        Vector3 scale = transform.localScale;
+        scale.x *= -1;
+        transform.localScale = scale;
     }
 }

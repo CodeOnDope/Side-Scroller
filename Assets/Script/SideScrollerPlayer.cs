@@ -5,26 +5,31 @@ public class SideScrollerPlayer : MonoBehaviour
     [Header("Movement Settings")]
     public float moveSpeed = 5f;
     public float jumpForce = 10f;
-    public float accelerationForce = 50f;  // Force applied to accelerate player
+
+    [Header("Shooting Settings")]
+    public GameObject bulletPrefab;
+    public Transform firePoint; // The point where bullets are fired
+    public float bulletSpeed = 10f;
+    public float fireRate = 0.5f;
 
     [Header("Ground Check")]
     public Transform groundCheck;
     public LayerMask groundLayer;
     public float groundCheckRadius = 0.2f;
 
-    [Header("Components")]
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
     private Animator animator;
 
-    // State variables
     private bool isGrounded;
     private float moveInput;
     private bool isFacingRight = true;
+    private float nextFireTime;
+    public float health = 100;
+    public int ammo = 10;
 
     void Start()
     {
-        // Get references to components
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
@@ -41,10 +46,15 @@ public class SideScrollerPlayer : MonoBehaviour
             Jump();
         }
 
-        // Update animations
-        UpdateAnimation();
+        // Handle shooting
+        if (Input.GetButtonDown("Fire1") && Time.time >= nextFireTime)
+        {
+            Shoot();
+            nextFireTime = Time.time + fireRate;
+        }
 
-        // Update facing direction
+        // Update animations and sprite direction
+        UpdateAnimation();
         UpdateSpriteDirection();
     }
 
@@ -53,50 +63,46 @@ public class SideScrollerPlayer : MonoBehaviour
         // Check if the player is on the ground
         isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
 
-        // Move the player (in FixedUpdate for physics)
+        // Move the player
         MovePlayer();
     }
 
     void MovePlayer()
     {
-        // Calculate target velocity
-        float targetVelocityX = moveInput * moveSpeed;
-
-        // Calculate how far we are from target velocity
-        float velocityDiff = targetVelocityX - rb.linearVelocity.x;
-
-        // Apply force proportional to the difference
-        float forceToApply = velocityDiff * accelerationForce;
-
-        // Apply horizontal force
-        rb.AddForce(new Vector2(forceToApply, 0), ForceMode2D.Force);
-
-        // Optional: Clamp maximum horizontal speed
-        if (Mathf.Abs(rb.linearVelocity.x) > moveSpeed)
-        {
-            rb.linearVelocity = new Vector2(Mathf.Sign(rb.linearVelocity.x) * moveSpeed, rb.linearVelocity.y);
-        }
+        rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
     }
 
     void Jump()
     {
-        // Reset vertical velocity before adding jump force for consistent jumps
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
-
-        // Apply a vertical impulse force for jumping
-        rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-
-        // Trigger jump animation if animator exists
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
         if (animator != null)
         {
             animator.SetTrigger("Jump");
         }
     }
 
-    // Update sprite direction based on movement
+    void Shoot()
+    {
+        // Get the mouse position in world space
+        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        mousePosition.z = 0; // Ensure the z-coordinate is 0 for 2D
+
+        // Calculate the direction from the fire point to the mouse position
+        Vector2 direction = (mousePosition - firePoint.position).normalized;
+
+        // Instantiate the bullet and set its velocity
+        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.identity);
+        Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
+        bulletRb.linearVelocity = direction * bulletSpeed;
+
+        // Rotate the bullet to face the direction it's traveling
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        bullet.transform.rotation = Quaternion.Euler(0, 0, angle);
+    }
+
     void UpdateSpriteDirection()
     {
-        // Flip the sprite based on movement direction
+        // Flip the player sprite based on movement direction
         if (moveInput > 0 && !isFacingRight)
         {
             Flip();
@@ -107,59 +113,57 @@ public class SideScrollerPlayer : MonoBehaviour
         }
     }
 
-    // Flip the sprite direction
     void Flip()
     {
         isFacingRight = !isFacingRight;
-
-        // Flip using sprite renderer
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.flipX = !isFacingRight;
-        }
-        // Alternative: Flip using transform scale
-        else
-        {
-            Vector3 currentScale = transform.localScale;
-            currentScale.x *= -1;
-            transform.localScale = currentScale;
-        }
+        Vector3 scale = transform.localScale;
+        scale.x = isFacingRight ? Mathf.Abs(scale.x) : -Mathf.Abs(scale.x);
+        transform.localScale = scale;
     }
 
-    // Update animation parameters
     void UpdateAnimation()
     {
         if (animator == null) return;
 
-        // Set animation parameters
         animator.SetFloat("Speed", Mathf.Abs(rb.linearVelocity.x));
         animator.SetBool("IsGrounded", isGrounded);
-
-        // Fall animation
-        animator.SetFloat("VerticalVelocity", rb.linearVelocity.y);
     }
 
-    // For visualization in editor
-    void OnDrawGizmosSelected()
-    {
-        if (groundCheck != null)
-        {
-            // Draw ground check radius
-            Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
-        }
-    }
-
-    // Public method to apply damage to player (can be called by enemies)
     public void TakeDamage(float damageAmount)
     {
-        // Trigger hit animation
         if (animator != null)
         {
             animator.SetTrigger("Hit");
         }
+        if (health <= 0)
+        Destroy(gameObject);
+        else
+        health -= damageAmount;
+       
+        // Add health logic here
+    }
 
-        // Add your health logic here
-        // PlayerHealth.instance.TakeDamage(damageAmount);
+    public void RestoreHealth(int amount)
+    {
+        health += amount;
+        Debug.Log($"Health restored by {amount}. Current health: {health}");
+    }
+
+    public void AddAmmo(int amount)
+    {
+        ammo += amount;
+        Debug.Log($"Ammo increased by {amount}. Current ammo: {ammo}");
+    }
+
+    public void ActivatePowerUp(float duration)
+    {
+        Debug.Log($"Power-up activated for {duration} seconds!");
+        // Implement power-up logic (e.g., increased speed, damage, etc.)
+    }
+
+    public void UnlockSpecialAbility(string abilityName)
+    {
+        Debug.Log($"Special ability unlocked: {abilityName}");
+        // Implement logic for unlocking special abilities
     }
 }
