@@ -1,11 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class PlayerUI : MonoBehaviour
 {
     [Header("UI Elements")]
-    public Text healthText; // Reference to the health UI text
-    public Text scoreText; // Reference to the score UI text
+    public TMP_Text healthText; // Reference to the health UI text
+    public TMP_Text scoreText; // Reference to the score UI text
     public GameObject gameCompletedScreen; // Reference to the game completed screen
     public GameObject menuScreen; // Reference to the menu screen
 
