@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: NewPickupData
   m_EditorClassIdentifier: 
   pickupName: HealthPotion
-  pickupSprite: {fileID: -5797564145312637884, guid: a02eb9753be539642815b031103bef89, type: 3}
+  pickupSprite: {fileID: -6305943057513568473, guid: 907336dde9a3d524eb3dba4c8c15b253, type: 3}
   type: 0
   healthRestoreAmount: 50
   ammoAmount: 0

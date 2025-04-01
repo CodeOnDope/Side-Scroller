@@ -22,4 +22,4 @@ MonoBehaviour:
   bulletSpeed: 5
   damage: 10
   pickupToDrop: {fileID: 11400000, guid: 259e6a2193a27c945a97a3cadd0feb8f, type: 2}
-  dropChance: 0.5
+  dropChance: 1

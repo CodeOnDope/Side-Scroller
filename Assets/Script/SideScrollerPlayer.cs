@@ -27,12 +27,16 @@ public class SideScrollerPlayer : MonoBehaviour
     private float nextFireTime;
     public float health = 100;
     public int ammo = 10;
-
+    public PlayerUI playerUI;
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
+        if (playerUI != null)
+        {
+            playerUI.UpdateHealth(health);
+        }
     }
 
     void Update()
@@ -131,21 +135,27 @@ public class SideScrollerPlayer : MonoBehaviour
 
     public void TakeDamage(float damageAmount)
     {
-        if (animator != null)
-        {
-            animator.SetTrigger("Hit");
-        }
-        if (health <= 0)
-        Destroy(gameObject);
-        else
         health -= damageAmount;
-       
+        if (playerUI != null)
+        {
+            playerUI.UpdateHealth(health);
+        }
+
+        if (health <= 0)
+        {
+            Die();
+        }
+
         // Add health logic here
     }
 
     public void RestoreHealth(int amount)
     {
         health += amount;
+        if (playerUI != null)
+        {
+            playerUI.UpdateHealth(health);
+        }
         Debug.Log($"Health restored by {amount}. Current health: {health}");
     }
 
@@ -165,5 +175,11 @@ public class SideScrollerPlayer : MonoBehaviour
     {
         Debug.Log($"Special ability unlocked: {abilityName}");
         // Implement logic for unlocking special abilities
+    }
+    void Die()
+    {
+        Destroy(gameObject);
+        Debug.Log("Player Died!");
+        // Add logic for game over or respawn
     }
 }
